@@ -51,11 +51,18 @@ type UberEatsPlatformData struct {
 }
 
 type ToastPlatformData struct {
-	GUID           string    `bson:"guid" json:"guid"`
-	MultiLocationID string   `bson:"multi_location_id" json:"multi_location_id"`
-	PriceCents     int64     `bson:"price_cents" json:"price_cents"`
-	StockStatus    string    `bson:"stock_status" json:"stock_status"` // "IN_STOCK", "OUT_OF_STOCK"
-	LastSynced     time.Time `bson:"last_synced" json:"last_synced"`
+	GUID            string    `bson:"guid" json:"guid"`
+	MultiLocationID string    `bson:"multi_location_id" json:"multi_location_id"`
+	PriceCents      int64     `bson:"price_cents" json:"price_cents"`
+	StockStatus     string    `bson:"stock_status" json:"stock_status"` // "IN_STOCK", "OUT_OF_STOCK"
+	MenuGroup       string    `bson:"menu_group" json:"menu_group"`
+	LastSynced      time.Time `bson:"last_synced" json:"last_synced"`
+
+	// Analytics fields populated from Toast ERA (enterprise-metrics:read scope).
+	WeeklyUnitsSold  int       `bson:"weekly_units_sold,omitempty" json:"weekly_units_sold,omitempty"`
+	WeeklyNetSales   float64   `bson:"weekly_net_sales,omitempty" json:"weekly_net_sales,omitempty"`
+	WeeklyAvgPrice   float64   `bson:"weekly_avg_price,omitempty" json:"weekly_avg_price,omitempty"`
+	AnalyticsUpdated time.Time `bson:"analytics_updated,omitempty" json:"analytics_updated,omitempty"`
 }
 
 type R365PlatformData struct {

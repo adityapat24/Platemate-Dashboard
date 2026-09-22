@@ -9,6 +9,7 @@ import (
 	"github.com/adityapat24/platemate-agentic/internal/api/handlers"
 	"github.com/adityapat24/platemate-agentic/internal/db"
 	"github.com/adityapat24/platemate-agentic/internal/models"
+	"github.com/adityapat24/platemate-agentic/internal/platform/toast"
 	"github.com/adityapat24/platemate-agentic/internal/platform/ubereats"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -18,7 +19,7 @@ import (
 )
 
 // NewRouter builds and returns the Gin engine with all routes registered.
-func NewRouter(ueAdapter *ubereats.Adapter) *gin.Engine {
+func NewRouter(ueAdapter *ubereats.Adapter, toastAdapter *toast.Adapter) *gin.Engine {
 	r := gin.Default()
 
 	r.Use(cors.New(cors.Config{
@@ -45,7 +46,7 @@ func NewRouter(ueAdapter *ubereats.Adapter) *gin.Engine {
 		// Dishes
 		api.GET("/dishes", handlers.ListDishes)
 		api.GET("/dishes/:id", handlers.GetDish)
-		api.POST("/dishes/sync", handlers.SyncMenu(ueAdapter))
+		api.POST("/dishes/sync", handlers.SyncMenu(ueAdapter, toastAdapter))
 
 		// Actions
 		api.POST("/actions/execute", handlers.ExecuteAction(ueAdapter))
@@ -53,13 +54,21 @@ func NewRouter(ueAdapter *ubereats.Adapter) *gin.Engine {
 		api.GET("/actions", handlers.ListActions)
 		api.POST("/actions/:id/rollback", handlers.RollbackAction(ueAdapter))
 
-		// Onboarding
+		// Onboarding — Uber Eats
 		ob := handlers.NewOnboardingHandlers(ueAdapter)
 		api.GET("/onboarding/ubereats/auth-url", ob.GetUberAuthURL)
 		api.GET("/onboarding/ubereats/callback", ob.UberCallback)
 		api.GET("/onboarding/ubereats/stores", ob.ListMerchantStores)
 		api.POST("/onboarding/ubereats/provision", ob.ProvisionStores)
 		api.GET("/onboarding/ubereats/status", ob.GetConnectionStatus)
+
+		// Onboarding — Toast
+		if toastAdapter != nil {
+			tob := handlers.NewToastOnboardingHandlers(toastAdapter)
+			api.POST("/onboarding/toast/connect", tob.ConnectToast)
+			api.GET("/onboarding/toast/status", tob.GetToastConnectionStatus)
+		}
+
 		api.GET("/onboarding/status", handlers.GetAllConnections)
 	}
 

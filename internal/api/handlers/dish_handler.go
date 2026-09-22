@@ -2,11 +2,13 @@ package handlers
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"time"
 
 	"github.com/adityapat24/platemate-agentic/internal/db"
 	"github.com/adityapat24/platemate-agentic/internal/models"
+	"github.com/adityapat24/platemate-agentic/internal/platform/toast"
 	"github.com/adityapat24/platemate-agentic/internal/platform/ubereats"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
@@ -73,22 +75,45 @@ func GetDish(c *gin.Context) {
 	c.JSON(http.StatusOK, dish)
 }
 
-// SyncMenu triggers an Uber Eats menu sync for the restaurant.
-func SyncMenu(ueAdapter *ubereats.Adapter) gin.HandlerFunc {
+// SyncMenu triggers a menu sync across all connected platforms for the restaurant.
+// Uber Eats sync is required to succeed; Toast sync is best-effort (skipped if not connected).
+func SyncMenu(ueAdapter *ubereats.Adapter, toastAdapter *toast.Adapter) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		restaurantID := c.GetString("restaurant_id")
 
-		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 		defer cancel()
 
-		results, err := ueAdapter.SyncMenu(ctx, restaurantID)
-		if err != nil {
-			c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
-			return
+		syncedByPlatform := map[string]int{}
+		errors := map[string]string{}
+
+		// Uber Eats sync.
+		if ueResults, err := ueAdapter.SyncMenu(ctx, restaurantID); err != nil {
+			errors["uber_eats"] = err.Error()
+		} else {
+			syncedByPlatform["uber_eats"] = len(ueResults)
 		}
+
+		// Toast sync (best-effort — silently skipped if restaurant not connected).
+		if toastAdapter != nil {
+			if toastResults, err := toastAdapter.SyncMenu(ctx, restaurantID); err != nil {
+				log.Printf("[sync] toast skipped for %s: %v", restaurantID, err)
+				errors["toast"] = err.Error()
+			} else {
+				syncedByPlatform["toast"] = len(toastResults)
+			}
+		}
+
+		totalSynced := 0
+		for _, n := range syncedByPlatform {
+			totalSynced += n
+		}
+
 		c.JSON(http.StatusOK, gin.H{
-			"synced":  len(results),
-			"message": "Menu sync complete",
+			"synced":           totalSynced,
+			"synced_by_platform": syncedByPlatform,
+			"errors":           errors,
+			"message":          "Menu sync complete",
 		})
 	}
 }

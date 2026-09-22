@@ -8,6 +8,7 @@ import (
 
 	"github.com/adityapat24/platemate-agentic/internal/api"
 	"github.com/adityapat24/platemate-agentic/internal/db"
+	"github.com/adityapat24/platemate-agentic/internal/platform/toast"
 	"github.com/adityapat24/platemate-agentic/internal/platform/ubereats"
 	"github.com/joho/godotenv"
 )
@@ -49,8 +50,25 @@ func main() {
 	}
 	ueAdapter := ubereats.NewAdapter(ueCfg, db.Database)
 
+	// Build the Toast adapter (credentials are optional — adapter is nil until .env is populated).
+	var toastAdapter *toast.Adapter
+	toastClientID := getEnv("TOAST_CLIENT_ID", "")
+	toastClientSecret := getEnv("TOAST_CLIENT_SECRET", "")
+	if toastClientID == "" || toastClientSecret == "" {
+		log.Println("Warning: TOAST_CLIENT_ID / TOAST_CLIENT_SECRET not set — Toast adapter disabled until credentials arrive")
+	} else {
+		toastCfg := toast.Config{
+			ClientID:     toastClientID,
+			ClientSecret: toastClientSecret,
+			APIBase:      getEnv("TOAST_API_BASE", "https://ws-sandbox.toasttab.com"),
+			AuthBase:     getEnv("TOAST_AUTH_BASE", "https://ws-sandbox.toasttab.com"),
+		}
+		toastAdapter = toast.NewAdapter(toastCfg, db.Database)
+		log.Println("Toast adapter initialized (sandbox mode)")
+	}
+
 	// Build and run the HTTP server.
-	router := api.NewRouter(ueAdapter)
+	router := api.NewRouter(ueAdapter, toastAdapter)
 	log.Printf("PlateMate API listening on :%s", port)
 	if err := router.Run(":" + port); err != nil {
 		log.Fatalf("Server: %v", err)
